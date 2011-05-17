@@ -1,0 +1,30 @@
+/*! \file TestLibrary.nxc
+	\brief Test cases for libNXC.h
+	
+	Test the functions provided by the library
+	libNXC.h.
+*/
+#include "libNXC.h"			// include out own library
+#include "robot.h"			// include robot definitions
+
+/*!
+	\brief Library Test suite
+
+	Test some library functions using a set of different
+	parameters.
+*/
+task main (void)
+{
+	// turn right 60 mm
+	RotateMotorMm(OUT_A, 50, 60,176);
+	// turn left 60 mm
+	RotateMotorMm(MOTOR_RIGHT, SPEED_MEDIUM, 60,CIRC);
+	// drive forward 50 mm
+	RotateMotorMm(MOTOR_BOTH, SPEED_MEDIUM,50,CIRC);
+	// rotate right 90 deg
+	RotateBaseDegrees(MOTOR_BOTH, SPEED_MEDIUM,90, DIAM, CDIST);
+	// rotate left 180 deg
+	RotateBaseDegrees(MOTOR_BOTH, SPEED_MEDIUM,-180, DIAM, CDIST);
+	// rotate right 90 deg
+	RotateBaseDegrees(MOTOR_BOTH, SPEED_MEDIUM,90, DIAM, CDIST);
+}

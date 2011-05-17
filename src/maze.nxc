@@ -1,0 +1,218 @@
+/*! \file maze.nxc
+	\brief Solves a simple maze using the right/left hand algorithm.
+	
+	This is an implementation of the right hand maze solving algorithm.
+	This file implements the state machine and state functions.
+	Definitions of the world (maze) and robot are outsourced to
+	corresponding header files.
+	
+	The state machine provides the following states:
+		- LINE: follow the line
+		- JUNC: when hitting a junction, position the axis above it
+		- LOOK:	look right for a new way at the junction
+		- EXIT: when the exit is found, leave the maze
+		- NDEF: no defined surface is observed, search one
+		- FINISH: maze left, shutdown
+	
+	\author thomas.zink
+	\version 20110517
+	
+	Changelog (only major events):
+		- 20110517 thomas.zink
+			- corrections on documentation
+			- created doc files
+			- moved all remaining debugging functions to debug.h
+			  (could move the audio output to another state machine in debug,
+			   however, would make things messy)
+		- 20101123 thomas.zink
+			- renamed My{World,Robot}.h
+			- moved debugging funs / tasks to debug.h
+			- changed comments to doxygen style comments
+		- 20100114 thomas.zink
+			- refactoring
+			- using libNXC and libNBC
+			- adjusted for new mazes
+		- 20090922 thomas.zink
+			- initial version
+*/
+//#define DEBUG	1						//!< set Debug
+
+//	INCLUDES
+#include "libNXC.h"				//!< our NXC extension library
+#include "robot.h"				//!< robot definitions
+#include "world.h"				//!< world (maze) definitions
+#ifdef DEBUG
+#include "debug.h"				//!< debugging tasks and functions
+#endif
+
+// STATES
+#define STATE_NDEF        0x01    //!< undefined, needs to find a defined surface
+#define STATE_LINE        0x02    //!< following a line
+#define STATE_JUNC        0x03    //!< hit a junction
+#define STATE_LOOK        0x04    //!< look for a new way at a junction
+#define STATE_EXIT        0x05    //!< exitting the maze
+#define STATE_FINISH      0x06    //!< all done, shutting down
+int state = STATE_NDEF;           //!< the current state the robot is in
+
+// IMPLEMENTATION OF THE STATE MACHINE
+/*!
+	\brief Search for a defined surface
+	
+	While the surface is undefined this function searches a defined surface.
+	The robot first look right for a number of rotations. Then left
+	with an increased number of rotations. This pattern continues until
+	the surface is defined again. The state is then changed accordingly.
+*/
+void ndef (void)
+{
+#ifdef DEBUG
+	PlayToneEx(400,100,2,false);
+#endif
+	int rotations = 20;
+	while (surface == SURFACE_NDEF) {
+		OnFwdEx(MOTOR_RIGHT, SPEED_MEDIUM, RESET_ALL);
+		OnRevEx(MOTOR_LEFT, SPEED_MEDIUM, RESET_ALL);
+		until (surface != SURFACE_NDEF || 
+			((abs(MotorRotationCount(MOTOR_RIGHT)) >= rotations) &&
+			(abs(MotorRotationCount(MOTOR_LEFT)) >= rotations))
+		);
+		Off(MOTOR_BOTH);
+		rotations *= 2;
+		OnFwdEx(MOTOR_LEFT, SPEED_MEDIUM, RESET_ALL);
+		OnRevEx(MOTOR_RIGHT, SPEED_MEDIUM, RESET_ALL);
+		until (surface != SURFACE_NDEF || 
+			((abs(MotorRotationCount(MOTOR_RIGHT)) >= rotations) &&
+			(abs(MotorRotationCount(MOTOR_LEFT)) >= rotations))
+		);
+		Off(MOTOR_BOTH);
+		rotations *= 2;
+	}
+	if (surface == SURFACE_LINE) state = STATE_LINE;
+	else if (surface == SURFACE_JUNC) state = STATE_JUNC;
+	else if (surface == SURFACE_EXIT) state = STATE_EXIT;
+	else state = STATE_NDEF;
+}
+// ndef
+
+/*!
+	\brief Follow the line
+	
+	Follows the line. Just drive forward until the surface
+	changes. Then change state accordingly.
+*/
+void line (void)
+{
+#ifdef DEBUG
+	PlayToneEx(300,100,2,false);
+#endif
+	OnFwdReg(MOTOR_BOTH, SPEED_MEDIUM, OUT_REGMODE_SPEED);
+	while (surface == SURFACE_LINE);
+	Off(MOTOR_BOTH);
+	if (surface == SURFACE_JUNC) state = STATE_JUNC;
+	else state = STATE_NDEF;
+}
+// line
+
+
+/*!
+	\brief Position the axis above a junction
+
+	Pass over the junction such that the axis is positioned
+	directly above the middle of the junction. This allows
+	turning on the spot and looking for the next way.
+*/
+void junc (void)
+{
+#ifdef DEBUG
+	PlayToneEx(600,100,2,false);
+#endif
+	RotateMotorMm(MOTOR_BOTH, SPEED_MEDIUM, SDIST, CIRC);
+	if (surface == SURFACE_EXIT) state = STATE_EXIT;
+	else state = STATE_LOOK;
+}
+// junc
+
+/*!
+	\brief Look for the next way
+
+	At a junction look for the next line to take. The algorithm
+	favors the rightmost way. The robot first turns to the right and then 
+	turns to the left until it hits a line. This one will be the rightmost
+	possible way.
+*/
+void look (void)
+{
+#ifdef DEBUG
+	PlayToneEx(1000,100,2,false);
+#endif	
+	RotateBaseDegrees(MOTOR_BOTH, SPEED_MEDIUM,120, DIAM, CDIST);
+	OnFwdSync(MOTOR_BOTH, SPEED_MEDIUM, -100);
+	while (surface != SURFACE_EXIT && surface != SURFACE_LINE);
+	Off(MOTOR_BOTH);
+	RotateBaseDegrees(MOTOR_BOTH, SPEED_MEDIUM,-10, DIAM, CDIST);
+	if (surface == SURFACE_EXIT) state = STATE_EXIT;
+	else if (surface == SURFACE_LINE) state = STATE_LINE;
+	else state = STATE_NDEF;
+}
+// look
+
+/*!
+	\brief Exit the maze
+
+	When the exit is found, just run forward until the surface changes.
+*/
+void exit_maze (void)
+{
+	OnFwdReg(MOTOR_BOTH, SPEED_MAX, OUT_REGMODE_SPEED);
+	while (
+		(MotorRunState(MOTOR_LEFT) != OUT_RUNSTATE_RUNNING) &&
+		(MotorRunState(MOTOR_RIGHT) != OUT_RUNSTATE_RUNNING) ||
+		surface == SURFACE_EXIT
+	);
+	Wait(200);
+	state = STATE_FINISH;
+}
+// exit_maze
+
+/*!
+	\brief The state machine
+
+	Implements the state machine. Start all background tasks and initializes
+	the robot. Sets the initial state according to surface. Runs the state
+	machine until finished. Then it shuts down.
+*/
+task main (void)
+{
+	// initialize and start tasks
+	init();
+	start observe;
+#ifdef DEBUG
+	start debug;
+#endif
+	// set initial state
+	if (surface == SURFACE_JUNC) state = STATE_JUNC;
+	else if (surface == SURFACE_LINE) state = STATE_LINE;
+	else state = STATE_NDEF;
+	// the state machine
+	while (state != STATE_FINISH) {
+		switch (state) {
+			case STATE_LINE:
+				line();
+				break;
+			case STATE_NDEF:
+				ndef();
+				break;
+			case STATE_JUNC:
+				junc();
+				break;
+			case STATE_LOOK:
+				look();
+				break;
+			case STATE_EXIT:
+				exit_maze();
+				break;
+		}
+	}
+	Off(MOTOR_BOTH);
+}
+// main

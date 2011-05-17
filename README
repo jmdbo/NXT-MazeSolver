@@ -1,0 +1,64 @@
+no Copyright (0) 2010-2011 Thomas Zink (7hz1nk@gmail.com)
+
+============================================================================
+NXT Maze Solver
+============================================================================
+
+Implements the right hand maze solving algorithm in NXC / NBC. The NXT is
+built using a Lego Mindstorms NXT Education set (though a standard retail
+set should also do). Mazes are randomly generated using a maze generator
+and can be printed out as a 1m^2 poster. However any other material, like duct
+tape etc, which can function as a surface can be used to model the mazes.
+
+Mazes must have one of three allowed specific color schemes. See the file 
+/src/world.h for details on maze characteristics.
+
+-----------------------------------------------------------------------------
+Content
+-----------------------------------------------------------------------------
+./
+README.txt				this readme file
+LICENSE.txt 			license file
+Makefile 				gnu make Makefile
+bin/					built directory, binaries
+src/ 					source directory
+	maze.nxc 			main maze solver application
+	robot.h 			all robot related definitions and tasks
+	world.h 			everything related to defining and observing the maze
+	debug.h 			debugging tasks and definitions
+	libNXC.h 			useful library functions in NXC
+	libNBC.h			same library functions as in libNXC but in NBC
+doc/ 					documentation directory (html)
+tst/					test files
+	testlib.h			provides very basic library testing
+etc/ 					example mazes (todo: maze generator)
+
+-----------------------------------------------------------------------------
+License
+-----------------------------------------------------------------------------
+
+This work is release in the public domain under the terms of the CC0
+http://creativecommons.org/publicdomain/zero/1.0/
+http://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+-----------------------------------------------------------------------------
+Part List & Requirements
+-----------------------------------------------------------------------------
+[1] Lego Mindstorms NXT Education set (also works with retail set)
+[1] HT Color Sensor (if Lego Color Sensor is used, world.h needs to be
+rewritten)
+[1] (optional) HT Prototype Sensor Kit
+[1] Maze
+
+-----------------------------------------------------------------------------
+Building Instructions
+-----------------------------------------------------------------------------
+The base model is the standard Lego Mindstorms NXT Education model. The sensor
+array is slightly altered to allow the HT Color Sensor to be positioned
+parallel to the surface (you can figure that out).
+
+-----------------------------------------------------------------------------
+Compile and Install
+-----------------------------------------------------------------------------
+run 
+	$ make
